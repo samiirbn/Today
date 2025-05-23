@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Today - Weather and Tide App</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap');
+  body {
+    margin: 0;
+    background: linear-gradient(135deg, #0099F7, #F11712);
+    font-family: 'Montserrat', sans-serif;
+    color: #fff;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  header {
+    text-align: center;
+    margin-bottom: 25px;
+    animation: fadeInDown 0.8s ease forwards;
+  }
+  header h1 {
+    font-weight: 700;
+    font-size: 3rem;
+    margin: 0;
+    text-shadow: 0 0 10px rgba(0,0,0,0.3);
+  }
+  header p {
+    font-weight: 400;
+    font-size: 1.3rem;
+    margin: 6px 0 0;
+    opacity: 0.85;
+    text-shadow: 0 0 6px rgba(0,0,0,0.2);
+  }
+  main {
+    background: rgba(255,255,255,0.14);
+    border-radius: 20px;
+    padding: 35px 40px;
+    max-width: 620px;
+    width: 100%;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    animation: fadeInUp 0.8s ease forwards;
+  }
+  h2 {
+    margin-top: 0;
+    font-weight: 700;
+    border-bottom: 3px solid #fff;
+    padding-bottom: 10px;
+    margin-bottom: 25px;
+    font-size: 2rem;
+    letter-spacing: 0.04em;
+    user-select: none;
+  }
+  .section {
+    margin-bottom: 35px;
+  }
+  .loading {
+    font-style: italic;
+    opacity: 0.8;
+    font-size: 1.2rem;
+    user-select: none;
+  }
+  .data-row {
+    display: flex;
+    justify-content: space-between;
+    margin: 15px 0;
+    font-size: 1.3rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    user-select: text;
+  }
+  .label {
+    font-weight: 700;
+  }
+  footer.footer {
+    margin-top: 50px;
+    font-size: 1.1rem;
+    opacity: 0.8;
+    text-align: center;
+    user-select: none;
+  }
+  footer.footer a {
+    color: #ffe082;
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.3s ease;
+  }
+  footer.footer a:hover {
+    text-decoration: underline;
+    color: #fff176;
+  }
+  @keyframes fadeInDown {
+    0% {opacity: 0; transform: translateY(-30px);}
+    100% {opacity: 1; transform: translateY(0);}
+  }
+  @keyframes fadeInUp {
+    0% {opacity: 0; transform: translateY(30px);}
+    100% {opacity: 1; transform: translateY(0);}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Today</h1>
+  <p>Weather and Tide Information for Your Location</p>
+</header>
+<main>
+  <section class="section" id="location-section">
+    <h2>Your Location</h2>
+    <div id="location" class="loading">Fetching location...</div>
+    <div id="placename" style="margin-top: 6px; font-size: 1.1rem; font-weight: 400; opacity: 0.85;"></div>
+  </section>
+
+  <section class="section" id="weather-section">
+    <h2>Current Weather</h2>
+    <div id="weather" class="loading">Loading weather data...</div>
+  </section>
+
+  <section class="section" id="astro-section">
+    <h2>Sun Times</h2>
+    <div id="astronomy" class="loading">Loading astronomical data...</div>
+  </section>
+
+  <section class="section" id="tide-section">
+    <h2>Bangladesh River Tides (Approximate)</h2>
+    <div id="tides" class="loading">Loading tide information...</div>
+  </section>
+</main>
+
+<footer class="footer">
+  Developed by: Samir Hosen | Email: <a href="mailto:samir.bn1003@gmail.com">samir.bn1003@gmail.com</a>
+</footer>
+
+<script>
+  function formatTime(date) {
+    return date.toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit', hour12: false, timeZone: 'Asia/Dhaka'});
+  }
+  function degreesToDirection(deg) {
+    const directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+    return directions[Math.round(deg / 45) % 8];
+  }
+  function getLocation() {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject('Browser does not support Geolocation.');
+      } else {
+        navigator.geolocation.getCurrentPosition((pos) => {
+          resolve({lat: pos.coords.latitude, lon: pos.coords.longitude});
+        }, (err) => {
+          reject('Unable to retrieve location. Please allow access and try again.');
+        });
+      }
+    });
+  }
+  async function fetchWeather(lat, lon) {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&hourly=relative_humidity_2m`;
+    const response = await fetch(url);
+    if(!response.ok) throw new Error('Failed to load weather data.');
+    const data = await response.json();
+    return data;
+  }
+  async function fetchAstronomy(lat, lon) {
+    const url = `https://api.sunrise-sunset.org/json?lat=${lat}&lng=${lon}&formatted=0`;
+    const response = await fetch(url);
+    if(!response.ok) throw new Error('Failed to load astronomical data.');
+    const data = await response.json();
+    return data.results;
+  }
+  const baseTideTimes = {
+    "Padma": ["03:30", "16:00"],
+    "Meghna": ["04:00", "16:30"],
+    "Jamuna": ["03:45", "16:15"],
+    "Karnaphuli": ["01:15", "13:45"]
+  };
+  function getCurrentTide(riverName) {
+    const now = new Date();
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    let tides = baseTideTimes[riverName];
+    let tideMinutes = tides.map(t => {
+      const [hr,min] = t.split(":").map(Number);
+      return hr * 60 + min;
+    });
+    let nextHighTideTime = null;
+    let nextLowTideTime = null;
+    for (let i=0; i < tideMinutes.length; i++) {
+      if (tideMinutes[i] > nowMinutes) {
+        nextHighTideTime = tideMinutes[i];
+        nextLowTideTime = tideMinutes[i] - 360;
+        if(nextLowTideTime < 0) nextLowTideTime += 1440;
+        break;
+      }
+    }
+    if(nextHighTideTime === null){
+      nextHighTideTime = tideMinutes[0] + 1440;
+      nextLowTideTime = tideMinutes[0] - 360 + 1440;
+    }
+    const diffHigh = Math.abs(nowMinutes - nextHighTideTime);
+    const diffLow = Math.abs(nowMinutes - nextLowTideTime);
+    let tideState = '';
+    let tideTime;
+    if(diffHigh <= diffLow){
+      tideState = 'High Tide';
+      tideTime = nextHighTideTime;
+    } else {
+      tideState = 'Low Tide';
+      tideTime = nextLowTideTime;
+    }
+    const tideHr = Math.floor(tideTime / 60) % 24;
+    const tideMin = tideTime % 60;
+    const tideTimeStr = tideHr.toString().padStart(2, '0') + ':' + tideMin.toString().padStart(2, '0');
+    return {state: tideState, time: tideTimeStr};
+  }
+  async function fetchPlaceName(lat, lon) {
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`;
+      const response = await fetch(url, {headers: {'User-Agent': 'Today Weather Tide App - contact: samir.bn1003@gmail.com'}});
+      if(!response.ok) throw new Error('Failed to fetch place name');
+      const data = await response.json();
+      return data.address.city || data.address.town || data.address.village || data.address.county || data.address.state || data.address.country || data.display_name || 'Unknown location';
+    } catch(err) {
+      return null;
+    }
+  }
+  async function showApp() {
+    const locationDiv = document.getElementById('location');
+    const placeDiv = document.getElementById('placename');
+    const weatherDiv = document.getElementById('weather');
+    const astroDiv = document.getElementById('astronomy');
+    const tideDiv = document.getElementById('tides');
+    try {
+      const pos = await getLocation();
+      locationDiv.textContent = `Latitude: ${pos.lat.toFixed(4)}, Longitude: ${pos.lon.toFixed(4)}`;
+      placeDiv.textContent = 'Resolving location name...';
+      const placeName = await fetchPlaceName(pos.lat, pos.lon);
+      if(placeName) {
+        placeDiv.textContent = `Location: ${placeName}`;
+      } else {
+        placeDiv.textContent = '';
+      }
+      weatherDiv.textContent = 'Loading weather data...';
+      const weatherData = await fetchWeather(pos.lat, pos.lon);
+      if (!weatherData?.current_weather) throw new Error('Weather data unavailable.');
+      const current = weatherData.current_weather;
+      let humidityPercent = 'Unknown';
+      if(weatherData.hourly && weatherData.hourly.relative_humidity_2m){
+        const weatherTime = new Date(current.time);
+        const currentHour = weatherTime.getUTCHours();
+        const rhIndex = weatherData.hourly.time.findIndex(t => new Date(t).getUTCHours() === currentHour);
+        if(rhIndex !== -1){
+          humidityPercent = weatherData.hourly.relative_humidity_2m[rhIndex] + '%';
+        }
+      }
+      const windDirDesc = degreesToDirection(current.winddirection);
+      const tempC = current.temperature.toFixed(1);
+      const windSpeed = current.windspeed.toFixed(1);
+      weatherDiv.innerHTML = '';
+      const weatherFields = [
+        {label: 'Temperature', value: `${tempC} °C`},
+        {label: 'Wind Speed', value: `${windSpeed} km/h`},
+        {label: 'Wind Direction', value: windDirDesc},
+        {label: 'Humidity', value: humidityPercent}
+      ];
+      weatherFields.forEach(f=>{
+        const div = document.createElement('div');
+        div.className = 'data-row';
+        div.innerHTML = `<span class="label">${f.label}:</span> <span>${f.value}</span>`;
+        weatherDiv.appendChild(div);
+      });
+      astroDiv.textContent = 'Loading astronomical data...';
+      const astro = await fetchAstronomy(pos.lat, pos.lon);
+      const sunriseTime = new Date(astro.sunrise);
+      const sunsetTime = new Date(astro.sunset);
+      astroDiv.innerHTML = '';
+      const astroFields = [
+        {label: 'Sunrise', value: formatTime(sunriseTime)},
+        {label: 'Sunset', value: formatTime(sunsetTime)}
+      ];
+      astroFields.forEach(f=>{
+        const div = document.createElement('div');
+        div.className = 'data-row';
+        div.innerHTML = `<span class="label">${f.label}:</span> <span>${f.value}</span>`;
+        astroDiv.appendChild(div);
+      });
+      tideDiv.innerHTML = '';
+      const rivers = ["Padma", "Meghna", "Jamuna", "Karnaphuli"];
+      rivers.forEach(river => {
+        const tideInfo = getCurrentTide(river);
+        const div = document.createElement('div');
+        div.className = 'data-row';
+        div.innerHTML = `<span class="label">${river} River:</span> <span>${tideInfo.state} - Estimated time: ${tideInfo.time}</span>`;
+        tideDiv.appendChild(div);
+      });
+    } catch (err) {
+      locationDiv.textContent = err;
+      placeDiv.textContent = '';
+      weatherDiv.textContent = 'Weather information is unavailable.';
+      astroDiv.textContent = 'Astronomical information is unavailable.';
+      tideDiv.textContent = 'Tide information is unavailable.';
+      console.error(err);
+    }
+  }
+  showApp();
+</script>
+</body>
+</html>
